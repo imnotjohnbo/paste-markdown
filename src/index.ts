@@ -2,6 +2,7 @@ import {install as installImageLink, uninstall as uninstallImageLink} from './pa
 import {install as installLink, uninstall as uninstallLink} from './paste-markdown-link'
 import {install as installTable, uninstall as uninstallTable} from './paste-markdown-table'
 import {install as installText, uninstall as uninstallText} from './paste-markdown-text'
+import {install as installHTML, uninstall as uninstallHTML} from './paste-markdown-html'
 
 interface Subscription {
   unsubscribe: () => void
@@ -12,6 +13,7 @@ function subscribe(el: HTMLElement): Subscription {
   installImageLink(el)
   installLink(el)
   installText(el)
+  installHTML(el)
 
   return {
     unsubscribe: () => {
@@ -19,6 +21,7 @@ function subscribe(el: HTMLElement): Subscription {
       uninstallImageLink(el)
       uninstallLink(el)
       uninstallText(el)
+      uninstallHTML(el)
     }
   }
 }
@@ -29,8 +32,10 @@ export {
   installLink,
   installTable,
   installText,
+  installHTML,
   uninstallImageLink,
   uninstallTable,
   uninstallLink,
-  uninstallText
+  uninstallText,
+  uninstallHTML
 }
