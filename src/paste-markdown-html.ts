@@ -29,8 +29,16 @@ function onPaste(event: ClipboardEvent) {
   const parser = new DOMParser()
   const doc = parser.parseFromString(textHTML, 'text/html')
 
+  // TODO: fix hr, which has no innerText
+  // The problem is transform replaces the innerText of the element,
+  // but hr has no innerText.
+  // A solution might be to get the innerText of the next sibling, or previous
+  // sibling, and use that as the replacement.
+  const hr = doc.getElementsByTagName('hr')
+  let markdown = transformHr(hr, text, hrify)
+
   const a = doc.getElementsByTagName('a')
-  let markdown = transform(a, text, linkify)
+  markdown = transform(a, markdown, linkify)
 
   const levels = ['1', '2', '3', '4', '5', '6']
   levels.forEach((level: string) => {
@@ -49,37 +57,54 @@ function onPaste(event: ClipboardEvent) {
   // Task lists (<ul>, <li>)
   // Summary details 
   // Blockquotes (<blockquote>)
-  const blockquote = doc.getElementsByTagName('blockquote')
+  let blockquote = doc.getElementsByTagName('blockquote')
+  // remove all newlines in blockquotes
+  Array.from(blockquote).forEach(b => {
+    b.innerText = b.innerText.replace(/\n/g, ' ').trim()
+  })
   markdown = transform(blockquote, markdown, blockquotify)
 
-  // TODO: fix hr, which has no innerText
-  // The problem is transform replaces the innerText of the element,
-  // but hr has no innerText.
-  // A solution might be to get the innerText of the next sibling, or previous
-  // sibling, and use that as the replacement.
-  const hr = doc.getElementsByTagName('hr')
-  markdown = transform(hr, markdown, hrify)
-
-  // TODO: fix code and pre, which are not mutually exclusive
-  const code = doc.getElementsByTagName('code')
+  let code = doc.getElementsByTagName('code')
+  code = Array.from(code).filter(c => c.parentElement?.tagName !== 'PRE') as any
   markdown = transform(code, markdown, codify)
 
-  const pre = doc.getElementsByTagName('pre')
-  markdown = transform(pre, markdown, preify)
+  const pre = doc.querySelectorAll('pre>code')
+  markdown = transform(pre as any, markdown, preify)
 
   // Do not insert if no transforms have been made
   markdown !== text && insertText(field, markdown)
 }
 
-function transform(element: HTMLCollectionOf<HTMLElement>, text: string, transformer: any, ...args: any): string {
+function transformHr(element: HTMLCollectionOf<HTMLElement>, text: string, transformer: any, ...args: any): string {
   let markdown = ''
   Array.from(element).forEach((el: HTMLElement) => {
-    const {part, index} = trimAfter(text, el.innerText)
-    markdown += part.replace(el.innerText, transformer(el, args))
+    const next = el.nextElementSibling as HTMLElement
+    if (!next) return
+    const {part, index} = trimBefore(text, next.innerText)
+    markdown += part + transformer(el, args)
     text = text.slice(index)
   })
   markdown += text
   return markdown
+}
+
+function transform(elements: HTMLCollectionOf<HTMLElement>, text: string, transformer: any, ...args: any): string {
+  let markdown = ''
+  Array.from(elements).forEach((element: HTMLElement) => {
+    const {part, index} = trimAfter(text, element.innerText)
+    markdown += part.replace(element.innerText, transformer(element, args))
+    text = text.slice(index)
+  })
+  markdown += text
+  return markdown
+}
+
+function trimBefore(text: string, search: string): {part: string, index: number} {
+  const index = text.indexOf(search)
+  return { 
+    part: text.substring(0, index - 1),
+    index
+  }
 }
 
 function trimAfter(text: string, search: string): {part: string, index: number} {
@@ -125,7 +150,9 @@ function italify(italics: HTMLElement): string {
 }
 
 function hrify(hr: HTMLHRElement): string {
-  return `---`
+  return `
+---
+`
 }
 
 function blockquotify(blockquote: HTMLQuoteElement): string {
