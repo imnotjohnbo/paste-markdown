@@ -30,6 +30,69 @@ function insertText(textarea, text) {
     }
 }
 
+function install$4(el) {
+    el.addEventListener('paste', onPaste$4);
+}
+function uninstall$4(el) {
+    el.removeEventListener('paste', onPaste$4);
+}
+function onPaste$4(event) {
+    const transfer = event.clipboardData;
+    if (!transfer || !hasHTML(transfer))
+        return;
+    const field = event.currentTarget;
+    if (!(field instanceof HTMLTextAreaElement))
+        return;
+    if (isSelection(field))
+        return;
+    let text = transfer.getData('text/plain');
+    const textHTML = transfer.getData('text/html');
+    if (!textHTML)
+        return;
+    if (!text)
+        return;
+    text = text.trim();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(textHTML, 'text/html');
+    const a = doc.getElementsByTagName('a');
+    const markdown = transform(a, text, linkify$2);
+    if (markdown === text)
+        return;
+    event.stopPropagation();
+    event.preventDefault();
+    insertText(field, markdown);
+}
+function transform(elements, text, transformer, ...args) {
+    let markdown = '';
+    for (const element of Array.from(elements)) {
+        const textContent = element.textContent || '';
+        const { part, index } = trimAfter(text, textContent);
+        markdown += part.replace(textContent, transformer(element, args));
+        text = text.slice(index);
+    }
+    markdown += text;
+    return markdown;
+}
+function trimAfter(text, search = '') {
+    let index = text.indexOf(search);
+    if (index === -1)
+        return { part: '', index };
+    index += search.length;
+    return {
+        part: text.substring(0, index),
+        index
+    };
+}
+function hasHTML(transfer) {
+    return Array.from(transfer.types).includes('text/html');
+}
+function isSelection(textarea) {
+    return textarea.selectionStart !== textarea.selectionEnd;
+}
+function linkify$2(element) {
+    return `[${element.textContent}](${element.href})`;
+}
+
 function install$3(el) {
     el.addEventListener('dragover', onDragover$1);
     el.addEventListener('drop', onDrop$1);
@@ -258,9 +321,11 @@ function subscribe(el) {
     install$3(el);
     install$2(el);
     install(el);
+    install$4(el);
     return {
         unsubscribe: () => {
             uninstall$1(el);
+            uninstall$4(el);
             uninstall$3(el);
             uninstall$2(el);
             uninstall(el);
@@ -268,4 +333,4 @@ function subscribe(el) {
     };
 }
 
-export { install$3 as installImageLink, install$2 as installLink, install$1 as installTable, install as installText, subscribe, uninstall$3 as uninstallImageLink, uninstall$2 as uninstallLink, uninstall$1 as uninstallTable, uninstall as uninstallText };
+export { install$4 as installHTML, install$3 as installImageLink, install$2 as installLink, install$1 as installTable, install as installText, subscribe, uninstall$4 as uninstallHTML, uninstall$3 as uninstallImageLink, uninstall$2 as uninstallLink, uninstall$1 as uninstallTable, uninstall as uninstallText };
